@@ -1,0 +1,38 @@
+name: Build Orpheus APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install packages
+        run: npm install
+      - name: Add the MP3 encoder to the app
+        run: cp node_modules/lamejs/lame.min.js www/lame.min.js
+      - name: Create the Android project
+        run: npx cap add android
+      - name: Turn off cloud backup
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:allowBackup="true"/android:allowBackup="false"/' "$M"
+          grep -n "INTERNET\|allowBackup" "$M" || true
+      - name: Copy app files
+        run: npx cap sync android
+      - name: Build the APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orpheus-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
